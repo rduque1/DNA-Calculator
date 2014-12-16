@@ -159,8 +159,9 @@ namespace DNA_Calculator
                 if (!rsid.ContainsKey(data[0]))
                     rsid.Add(data[0], data);
 
-                if(chr!=pchr)
+                if (chr != pchr || long.Parse(data[2]) - pos_end > 100000)
                 {
+
                     total_base_pairs = total_base_pairs + (pos_end - pos_start);
                     pos_start = long.Parse(data[2]);
                 }
@@ -244,6 +245,7 @@ namespace DNA_Calculator
 
         private void backgroundWorker2_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
+
             // because total_bp is HIR, we need to calcualate percentage for each allele.
             double percent = total_bp * 100.0 / (total_base_pairs * 2);// excluding X chromosome and positions not tested by DNA companies and mtdna otherwise it is 3.2 billion bp
             if (percent > 100)
