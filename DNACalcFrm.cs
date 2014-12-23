@@ -22,6 +22,13 @@ namespace DNA_Calculator
         string filename1 = null;
         string filename2 = null;
         long total_base_pairs = 0;
+        bool m_match_no_call = true;
+        long m_AllowedErrors=5;
+        long m_BasePairs = 5000000;
+        long m_GapToBreak=100000;
+        long m_SNPs=500;
+
+        long m_match_error_count=0;
         public DNACalcFrm()
         {
             InitializeComponent();
@@ -29,7 +36,7 @@ namespace DNA_Calculator
 
         private void DNACalcFrm_Load(object sender, EventArgs e)
         {
-
+            
         }
 
         public byte[] Zip(byte[] bytes)
@@ -126,7 +133,7 @@ namespace DNA_Calculator
 
         private void linkLabel1_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
         {
-            Process.Start("http://www.y-str.org/");
+            Process.Start("http://www.y-str.org/2014/12/dna-calculator.html");
         }
 
         private void backgroundWorker1_DoWork(object sender, DoWorkEventArgs e)
@@ -159,7 +166,7 @@ namespace DNA_Calculator
                 if (!rsid.ContainsKey(data[0]))
                     rsid.Add(data[0], data);
 
-                if (chr != pchr || long.Parse(data[2]) - pos_end > 100000)
+                if (chr != pchr || long.Parse(data[2]) - pos_end >= m_GapToBreak)
                 {
 
                     total_base_pairs = total_base_pairs + (pos_end - pos_start);
@@ -191,6 +198,8 @@ namespace DNA_Calculator
             string pchr=null;
             int i_chr=-1;
             int snp_count = 0;
+            bool doub = true;
+            m_match_error_count = 0;
             while ((line = reader.ReadLine()) != null)
             {
                 if (line.StartsWith("#") || line.StartsWith("RSID"))
@@ -203,21 +212,26 @@ namespace DNA_Calculator
                 {
                     chr=data[1];
 
+                    if (!isDoubleMatch(rsid[data[0]][3], data[3]))
+                        doub = false;
+
                     if (!int.TryParse(chr, out i_chr))
                         continue;
                     if (i_chr > 22 || i_chr <= 0)
-                        continue;
+                        continue;      
                     else if (!isMatch(rsid[data[0]][3], data[3]) || chr != pchr)
                     {
-                        if (segment_end - segment_start >= 100000 && snp_count>30) // 100000 bp
+                        if (segment_end - segment_start >= m_BasePairs && snp_count > m_SNPs) // 100000 bp
                         {
-                            if (rsid[data[0]][3] == data[3] || rsid[data[0]][3] == ReverseString(data[3]))
+                            if (doub)
                                 total_bp = total_bp + (segment_end - segment_start)*2;
                             else
-                                total_bp = total_bp + (segment_end - segment_start);
+                                total_bp = total_bp + (segment_end - segment_start);                            
                         }
+                        doub = true;
                         segment_start = long.Parse(rsid[data[0]][2]);
                         snp_count = 0;
+                        m_match_error_count = 0;
                     }
                     segment_end = long.Parse(rsid[data[0]][2]);
                     pchr=chr;
@@ -234,12 +248,25 @@ namespace DNA_Calculator
             return new string(arr);
         }
 
+        private bool isDoubleMatch(string p1, string p2)
+        {
+            if (p1 == p2 || p1==ReverseString(p2))
+                 return true;
+            return false;
+        }
+
         private bool isMatch(string p1, string p2)
         {
             foreach (char c1 in p1.ToCharArray())
                 foreach (char c2 in p2.ToCharArray())
                     if (c1 == c2)
                         return true;
+                    else if (m_match_no_call && (c1 == '-' || c2 == '-' || c1 == '?' || c2 == '?' || c1 == '0' || c2 == '0'))
+                        return true;
+
+            m_match_error_count++;
+            if (m_match_error_count <= m_AllowedErrors)
+                return true;
             return false;
         }
 
@@ -253,7 +280,15 @@ namespace DNA_Calculator
             neanPercent.Text = percent.ToString("#0.00") + "%";
             neanPercent.ForeColor = Color.Black;
             statusLbl.Text = "";
-            button1.Enabled = true;
+            //button1.Enabled = true;
+            //
+            tbAllowedErrors.Enabled = true;
+            tbBasePairs.Enabled = true;
+            tbGapToBreak.Enabled = true;
+            tbSNPs.Enabled = true;
+            cbMatchNoCalls.Enabled = true;
+            button3.Enabled = true;
+            button4.Enabled = true;
         }
 
         private void button2_Click(object sender, EventArgs e)
@@ -268,8 +303,40 @@ namespace DNA_Calculator
                 neanPercent.ForeColor = Color.Gray;
                 statusLbl.Text = "Loading ...";
                 button1.Enabled = false;
+
+                tbAllowedErrors.Enabled = false;
+                tbBasePairs.Enabled = false;
+                tbGapToBreak.Enabled = false;
+                tbSNPs.Enabled = false;
+                cbMatchNoCalls.Enabled = false;
+                button3.Enabled = false;
+                button4.Enabled = false;
+
+                long.TryParse(tbAllowedErrors.Text, out m_AllowedErrors);
+                long.TryParse(tbBasePairs.Text, out m_BasePairs);
+                long.TryParse(tbGapToBreak.Text, out m_GapToBreak);
+                long.TryParse(tbSNPs.Text, out  m_SNPs);
+                m_match_no_call = cbMatchNoCalls.Checked;
                 backgroundWorker1.RunWorkerAsync();
             }
+        }
+
+        private void button3_Click(object sender, EventArgs e)
+        {
+            tbAllowedErrors.Text = "1";
+            tbBasePairs.Text = "100000";
+            tbGapToBreak.Text = "100000";
+            tbSNPs.Text = "60";
+            cbMatchNoCalls.Checked = false;
+        }
+
+        private void button4_Click(object sender, EventArgs e)
+        {
+            tbAllowedErrors.Text = "5";
+            tbBasePairs.Text = "5000000";
+            tbGapToBreak.Text = "100000";
+            tbSNPs.Text = "500";
+            cbMatchNoCalls.Checked = true;
         }
     }
 }
